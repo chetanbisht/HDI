@@ -90,11 +90,11 @@
 
 
         d3.queue()
-            .defer(d3.json,"world-countries.json")
             .defer(d3.csv,"hdi.csv")
+                    .defer(d3.json,"world-countries.json")
             .defer(d3.csv,"hp_2017.csv")
             .defer(d3.csv,"hdi_trend.csv")
-            .await(function(error,json,hdidata,hpdata,hdi_trend){
+            .await(function(error,hdidata,json,hpdata,hdi_trend){
                 console.log(hdidata);
                 console.log(hpdata);
                 console.log(hdi_trend);
