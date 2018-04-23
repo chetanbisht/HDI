@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Human Development Index and World Happiness</title>
+    <script src="//d3js.org/d3.v4.js"></script>
+    <script src="https://unpkg.com/d3-simple-slider"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <script src="https://d3js.org/d3-drag.v1.min.js"></script>
+    <script src="https://d3js.org/d3-zoom.v1.min.js"></script>
+    <script src="https://d3js.org/d3-color.v1.min.js"></script>
+    <script src="https://d3js.org/d3-dispatch.v1.min.js"></script>
+    <script src="https://d3js.org/d3-ease.v1.min.js"></script>
+    <script src="https://d3js.org/d3-interpolate.v1.min.js"></script>
+    <script src="https://d3js.org/d3-selection.v1.min.js"></script>
+    <script src="https://d3js.org/d3-timer.v1.min.js"></script>
+    <script src="https://d3js.org/d3-transition.v1.min.js"></script>
+
+
+    <style type="text/css">
+        .axisBlue line{
+            stroke: lightblue;
+        }
+
+        .axisBlue path{
+            stroke: lightblue;
+        }
+
+        .axisBlue text{
+            fill: lightblue;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <!-- logo branding bar, on blue -->
+    <div class="logo-bar">
+        <div class="wrap">
+            <div class="logo">
+                <a style= "color:blue;font-size:20px;font-weight:bold">Human Development Index: United Nations report</a>
+            </div>
+            <div class="supportstatement">A project of the
+                <a href="http://hdr.undp.org/en/content/human-development-index-hdi"/>United Nations Development Programme</a> and
+                <br/>the
+                <a href="http://worldhappiness.report"/>World Happiness Report</a>
+            </div>
+        </div>
+    </div>
+    <!-- // END logo branding bar -->
+    <div style="position:absolute;top:130px;left:260px;width: 350px;height: 50px; font-weight: bold;font-size: 20px; background-color : white;">Human Development Index</div>
+    <div style="position:absolute;top:650px;left:260px;width: 350px;height: 50px; font-weight: bold;font-size: 20px; background-color : white;">World Happiness Index</div>
+
+    <div id="dropdown"
+         style="position:absolute;top:630px;left:650px;width:60px;height: 50px;"></div>
+    <div id="wmap_legends"
+         style="position:absolute;top:150px;left:10px;width:250px;height: 50px;"></div>
+    <div id="wmap"
+         style="position:absolute;top:200px;left:10px;width:600px;height: 400px;border:1px dotted white"></div>
+    <div id="linechart"
+         style="position:absolute; top:280px; left:650px; width: 520px; height: 320px;"></div>
+    <div id="dimchart"
+         style="position:absolute; top:120px; left:650px; width: 400px; height: 200px;"></div>
+    <div id="dimchart_txt"
+         style="position:absolute; top:270px; left:650px; width: 400px; height: 20px;"></div>
+    <div id="infotip"
+         style="position:absolute; top:650px; left:650px; width: 250px; height: 200px;"></div>
+    <p id="value"></p>
+    <div id="wmap_happy_legends"
+         style="position:absolute; top:630px; left:10px; width: 250px; height: 50px;"></div>
+    <div id="wmap_happy"
+         style="position:absolute; top:670px; left:10px; width: 600px; height: 400px;border:1px dotted white"></div>
+    <div id="dimchart_happy"
+         style="position:absolute; top:1070px; left:10px; width: 600px; height: 400px;"></div>
+    <div id="scatterplot"
+         style="position:absolute; top:750px; left:650px; width: 400px; height: 400px;"></div>
+
+
+
+    <script type="text/javascript">
+        // v6 works with both map working correctly and bar chart with 5 dimensions and txt
+        // v6.1 added tip info
+        // v6.2 Adding scatter plot
+        // v6.3 fixes in scatter plots etc
+        // v6.4 Adding line trends.
+        // v6.5 Everthing interacts.  Next fix data issues and cosmetic improvements
+        // v6.7 New color scheme for happiness working
+        // v6.8 All good for colors.
+
+
+
+
+        d3.queue()
+            .defer(d3.json,"./world-countries.json")
+            .defer(d3.csv,"./hdi.csv")
+            .defer(d3.csv,"./hp_2017.csv")
+            .defer(d3.csv,"./hdi_trend.csv")
+            .await(function(error,json,hdidata,hpdata,hdi_trend){
+                console.log(hdidata);
+                console.log(hpdata);
+                console.log(hdi_trend);
+                var countries=[];
+                hdidata.map(function(d){countries.push(d.country)})
+                console.log(countries);
+
+                data  = d3.map();
+                data1 = d3.map();
+                data2 = d3.map();
+                //obdata.forEach(function(d){data.set(d.st,d)});
+                hdidata.forEach(function (d){if(d.country){data.set(d.country,d)}});
+                hpdata.forEach(function (d){if(d.country){data1.set(d.country,d)}});
+                hdi_trend.forEach(function (d){if(d.country){data2.set(d.country,d)}});
+
+                console.log(data);
+                console.log(data1);
+                console.log(data2);
+                //var colors = ["white","blue","lightgreen","green","lightgreen","orange","red","purple","gray"]
+                var colors = ['#B1B3B6', '#4CA3A3', '#88BF6B', '#CBD36B', '#F9CE4D', '#F37032', '#BE1F24', '#62136D',"gray"]
+                var colorScale = d3.scaleThreshold().domain([0,10,15,20,25,30,35,100]).range(colors);
+
+                var color = d3.scaleThreshold()
+                    .domain([.1, .2, .3, .4, .5, .6, .7, .8, .9, 1])
+                    .range(['rgb(247,251,255)', 'rgb(222,235,247)', 'rgb(198,219,239)', 'rgb(158,202,225)', 'rgb(107,174,214)', 'rgb(66,146,198)', 'rgb(33,113,181)', 'rgb(8,81,156)', 'rgb(8,48,107)', 'rgb(3,19,43)']);
+
+
+                countries.sort();
+                var menu = d3.select("#dropdown")
+                menu.append("select")
+                    .selectAll("option")
+                    .data(countries)
+                    .enter()
+                    .append("option")
+                    .attr("value", function(d) { return d; })
+                    .text(function(d) { return d; })
+
+                menu.on('change',function(){
+                        var ct = d3.select(this).select("select").property("value")
+                    console.log(ct);
+                    update_dimchart(ct);
+                    update_dimcharth(ct);
+                    update_tipinfo(ct);
+                    update_line(ct);
+                    update_scatter(ct);
+                    update_happy_wmap_ct(ct);
+                    update_wmap_ct(ct);
+
+                })
+
+
+
+                //wmap_legends and color selection here.
+                var w=600, h=50;
+                var color_options_lg1 = ["rainbow","chloropleth","quartile","half"];
+                var color_lg1 = d3.scaleOrdinal().domain(color_options_lg1).range(["lightgreen","blue","orange","lightblue"])
+                var svg_lg1 = d3.select("#wmap_legends").append("svg").attr("width",w).attr("height",h);
+                var background_lg1 =  svg_lg1.append("rect").attr("id","backgroundRect").attr("fill","white").attr("width","100%").attr("height","100%").attr("x",0).attr("y",0)
+                var button_lg1 =  svg_lg1.append("g").attr("id","button_lg1")
+                var button_lg1_groups = button_lg1.selectAll("g.button")
+                    .data(color_options_lg1)
+                    .enter()
+                    .append("g")
+                    .attr("class","button")
+                    .style("cursor","pointer");
+
+                var bWidth= 40; //button width
+                var bHeight= 25; //button height
+                var bSpace= 10; //space between buttons
+                var x0= 20; //x offset
+                var y0= 10; //y offset
+
+                button_lg1_groups.append("rect")
+                    .attr("class","buttonRect")
+                    .attr("width",bWidth)
+                    .attr("height",bHeight)
+                    .attr("x",function(d,i) {
+                        return x0+(bWidth+bSpace)*i;
+                    })
+                    .attr("y",y0)
+                    .attr("rx",5)
+                    .attr("ry",5)
+                    .attr("fill",function(d){console.log(color_lg1(d)); return color_lg1(d)})
+                    .on("mouseover",function(d){d3.select(this).style("stroke","blue").style("stroke-width","3px")})
+                    .on("mouseout",function(d){d3.select(this).style("stroke","white").style("stroke-width","1px")})
+                    .on("click",function(d){
+                        //console.log(d)
+                        setColors_wmap(d);
+                    })
+
+                function setColors_wmap(d) {
+                    if(d=="rainbow"){
+                        var color = d3.scaleThreshold()
+                            .domain([.1, .2, .3, .4, .5, .6, .7, .8, .9, 1])
+                            .range(d3.schemeRdYlGn[10])
+                        update_wmap_cl(color);
+                    }
+                    if(d=="chloropleth"){
+                        var color = d3.scaleThreshold()
+                            .domain([.1, .2, .3, .4, .5, .6, .7, .8, .9, 1])
+                            .range(d3.schemeBlues[9])
+                               // .range(['rgb(247,251,255)', 'rgb(222,235,247)', 'rgb(198,219,239)', 'rgb(158,202,225)', 'rgb(107,174,214)', 'rgb(66,146,198)', 'rgb(33,113,181)', 'rgb(8,81,156)', 'rgb(8,48,107)', 'rgb(3,19,43)']);
+                        update_wmap_cl(color);
+                    }
+                    if(d=="quartile"){
+                        var color = d3.scaleThreshold()
+                            .domain([ .54,.699, .8,  1])
+                            .range(d3.schemeOranges[4])
+                            //.range(['orange', 'lightblue', 'blue', 'darkblue']);
+                        update_wmap_cl(color);
+                    }
+                    if(d=="half"){
+                        var color = d3.scaleThreshold()
+                            .domain([.5, 1])
+                            .range(['rgb(247,251,255)', 'rgb(107,174,214)',  'rgb(3,19,43)']);
+                        update_wmap_cl(color);
+                    }
+                }
+
+                function update_wmap_cl(color) {
+                    svg.selectAll("path")
+                        .style("fill", function(d) { //console.log(d);
+                            if(data.get(d.properties.name)!=undefined) {
+                                var ctdata = data.get(d.properties.name);
+                                if (ctdata["hdi_value"]) {
+                                    //console.log(ctdata["hdi_value"], ctdata["country"], color(ctdata["hdi_value"]), color(0), color(1));
+                                    return color(ctdata["hdi_value"]);
+                                } else {
+                                    return "lightgray";
+                                }
+                            } else { return "lightgray"}
+                        })
+                }
+
+
+                ///////////////////////////////////////////////////////////////////////////////////
+                //////////////////////////////////// Draw the HDI world map///////////////////////////
+                ///////////////////////////////////////////////////////////////////////////////////
+                 var w = 600 , h = 400;
+
+                //Define map projection
+                var projection = d3.geoMercator().translate([w/2, h/2]).scale([100]);
+                var path = d3.geoPath().projection(projection);
+
+                var svg = d3.select("#wmap")
+                    .append("svg")
+                    .attr("class","geopath")
+                    .attr("width", w)
+                    .attr("height", h);
+
+                var zoom = d3.zoom()
+                   // .translate(projection.translate())
+                   // .scale(projection.scale())
+                    .scaleExtent([h, 1.1 * h])
+                    .on("zoom", zoomed);
+                function zoomed() {
+                    svg.style("stroke-width", 1.5 / d3.event.transform.k + "px");
+                    svg.attr("transform", d3.event.transform); // updated for d3 v4
+                }
+                //svg.call(zoom);
+
+                svg.selectAll("path")
+                    .data(json.features)
+                    .enter()
+                    .append("path")
+                    .attr("class","worldmap")   // All these paths can be later referred in update with selecting this class
+                    .attr("d", path)
+                    .attr("stroke","white")
+                    .attr("country",function(d){   // Add a property to each path for state with state name
+                        if(data.get(d.properties.name)!=undefined) {
+                            var ctdata = data.get(d.properties.name);
+                            //console.log(d.properties.name, ctdata["country"]);
+                            return ctdata["country"];
+                        } else { //console.log(d.properties.name)
+                        }
+                    })
+                    .style("fill", function(d) { //console.log(d);
+                        if(data.get(d.properties.name)!=undefined) {
+                            var ctdata = data.get(d.properties.name);
+                            if (ctdata["hdi_value"]) {
+                               //console.log(ctdata["hdi_value"], ctdata["country"], color(ctdata["hdi_value"]), color(0), color(1));
+                                return color(ctdata["hdi_value"]);
+                            } else {
+                                return "#808080";
+                            }
+                        } else { return "lightgray"}
+                    })
+                    .text(function(d) {
+                        if(data.get(d.properties.name)!=undefined) {
+                            var ctdata = data.get(d.properties.name);
+                            //console.log(d.properties.name, ctdata["country"]);
+                            return ctdata["country"];
+                        }
+                    })
+                    .on("mouseover",function(d) {
+                        //console.log(this);
+                        d3.select(this).style("stroke","purple").style("stroke-width","6px");
+                        if(data.get(d.properties.name)!=undefined) {
+                            var ctdata = data.get(d.properties.name);
+                               //console.log(d.properties.name, ctdata);
+                            //return ctdata["country"];
+                            update_dimchart(d.properties.name);
+                            update_dimcharth(d.properties.name);
+                            update_tipinfo(d.properties.name);
+                            update_line(d.properties.name);
+                            update_scatter(d.properties.name)
+                        } else { console.log(d.properties.name)}
+
+                    })
+                    .on("mouseout",function(d){
+                        d3.select(this).style("stroke","white").style("stroke-width","1px")
+                    });
+
+                /////////////////////////////////////////////////////////////////////////
+                //////////////////////////// Update Functions /////////////////////////////
+                /////////////////////////////////////////////////////////////////////////
+
+                function update_dimchart(ct){
+                    //console.log(ctdata["loss_p"])
+                    var ctdata = data.get(ct);
+                    let ctdata_n = []
+                    ctdata_n["hdi_value"] = ctdata["hdi_value"];
+                    ctdata_n["adj_value"] = ctdata["adj_value"];
+                    ctdata_n["loss_p"] = ctdata["loss_p"]/100;
+                    ctdata_n["life exp"] = ctdata["life exp"]/84.2;
+                    ctdata_n["school exp"] = ctdata["school exp"]/20.4;
+                    ctdata_n["school mean"] = ctdata["school mean"]/13.4;
+                    ctdata_n["gni"] = ctdata.gni/100000;
+                    bar.selectAll("rect")
+                        .transition()
+                        .delay(1000)
+                        .attr("x",function(d){//console.log(d,xdim(d));
+                            return xdim(d)})
+                        .attr("y",function(d) {//console.log(heightdim);
+                            if (heightdim - ydim(ctdata_n[d]) > 0) {
+                                return ydim(ctdata_n[d]);
+                            }
+                        })
+                        .attr("width",xdim.bandwidth())
+                        .attr("height",function(d){//console.log(heightdim-ydim(ctdata_n[d]));
+                            if(heightdim-ydim(ctdata_n[d]) > 0){
+                            return heightdim-ydim(ctdata_n[d]);}
+                            else return 0;
+                        })
+                        // .style("fill", function(d){return colorsdim(dimensions)})
+                        .style("stroke","black")
+                    bar.selectAll("text")
+                        .transition()
+                        .delay(1000)
+                        .attr("y",function(d){
+                            if (heightdim - ydim(ctdata_n[d]) > 0) {
+                                return ydim(ctdata_n[d])}
+                                else return heightdim
+                        })
+
+                }
+
+//                 var dimensionsh = ["hp_value"," ","gdp","social_support","life_exp","freedom","generosity","perceived_corruption"];
+
+
+                function update_dimcharth(ct){
+                    //console.log(ctdata["loss_p"])
+                    var ctdatah = data1.get(ct);
+                    let ctdata_nh = []
+                    ctdata_nh["gdp"] = ctdatah["gdp"]/1.88;
+                    let tmp = ctdatah["social_support"]-0.396;
+                    ctdata_nh["social_support"] = tmp/1.214;
+                    ctdata_nh["life_exp"] = ctdatah["life_exp"];
+                    ctdata_nh["freedom"] = ctdatah["freedom"]/.66;
+                    ctdata_nh["generosity"] = ctdatah["generosity"]/.84;
+                    ctdata_nh["perceived_corruption"] = ctdatah["perceived_corruption"]/.47;
+                    let tmp1 = ctdatah.hp_value
+                    ctdata_nh["hp_value"] = tmp1/7.537;
+                    barh.selectAll("rect")
+                        .transition()
+                        .delay(500)
+                        .attr("x",function(d){//console.log(d,xdim(d));
+                            return xdimh(d)})
+                        .attr("y",function(d) {//console.log(heightdim);
+                            if (heightdimh - ydimh(ctdata_nh[d]) > 0) {
+                                return ydimh(ctdata_nh[d]);
+                            }
+                        })
+                        .attr("width",xdimh.bandwidth())
+                        .attr("height",function(d){//console.log(heightdim-ydim(ctdata_nh[d]));
+                            if(heightdimh-ydimh(ctdata_nh[d]) > 0){
+                                return heightdimh-ydimh(ctdata_nh[d]);}
+                            else return 0;
+                        })
+                        // .style("fill", function(d){return colorsdim(dimensions)})
+                        .style("stroke","black")
+                    barh.selectAll("text")
+                        .transition()
+                        .delay(1000)
+                        .attr("y",function(d){
+                            if (heightdimh - ydimh(ctdata_nh[d]) > 0) {
+                                return ydimh(ctdata_nh[d])}
+                            else return heightdimh
+                        })
+
+                }
+
+
+
+
+
+                function update_tipinfo(ct){ //console.log(ct)
+                    infohtml.html(function(d){
+                        var ctdata = data.get(ct); //console.log(ct, d, ctdata)
+                        var hpdata = data1.get(ct);
+                        return "<b style=\"color:orange;\">" +
+                        "Country:                   "+ctdata.country
+                            +"<BR>HD rank:                 "+ctdata.hdi_rank
+                            +"<BR>HD value:                "+ctdata.hdi_value
+                            +"<BR>Life exp(yrs):           "+ctdata["life exp"]
+                            +"<BR>Expected Schooling(yrs): "+ctdata["school exp"]
+                            +"<BR>GNI:                    $"+ctdata.gni
+                            +"<BR><BR>Happiness Rank:                 "+hpdata["hp_rank"]
+                            +"<BR>Happiness Value                 "+hpdata["hp_value"]
+                    })
+                }
+
+                function update_line(ct) {
+                    //console.log("the country update_line is "+ct
+                    svgl.selectAll(".line")
+                        .style("stroke-width", function(d) { //console.log(d);
+                            if (d.country == ct) {return "4px";
+                            } else {return "1px";}
+                        })
+                        .style("stroke", function(d) { //console.log(d);
+                            if (d.country == ct) {return "blue";
+                            } else {return "lightgray";}
+                        })
+                }
+
+                function update_wmap_ct (ct) {
+                    svg.selectAll(".worldmap")
+                        .style("stroke-width", function(d) { //console.log(d);
+                            if (d.properties.name == ct) {return "10px";
+                            } else {return "1px";}
+                        })
+                        .style("stroke", function(d) { //console.log(d);
+                            if (d.properties.name == ct) {return "purple";
+                            } else {return "white";}
+                        })
+                }
+
+                function update_happy_wmap_ct(ct) {
+                    svgh.selectAll(".worldmaph")
+                        .style("stroke-width", function(d) { //console.log(d);
+                            if (d.properties.name == ct) {return "10px";
+                            } else {return "1px";}
+                        })
+                        .style("stroke", function(d) { //console.log(d);
+                            if (d.properties.name == ct) {return "purple";
+                            } else {return "white";}
+                        })
+
+                }
+
+                function update_scatter(ct) {
+                    svgsc.selectAll("circle")
+                        .attr("r", function(d){
+                            if(d==ct) { return 14;} else {return 6}})
+                }
+
+                /////////////////////////////////////////////////////////////////////////
+                //////////////////////////////////// Draw the dimensions/////////////////
+                /////////////////////////////////////////////////////////////////////////
+
+                let heightdim = 150, widthdim = 350;
+                let margindim = {top:10, bottom:10, left:20, right:20};
+                let svgd = d3.select("#dimchart").append('svg')
+                    .attr('width',widthdim)
+                    .attr('height',heightdim)
+                    //.append("g")
+                    //.attr("transform","translate(10,10)");
+
+                var dimensions = ["hdi_value","adj_value","loss_p"," ","  ","life exp","school exp","gni"];
+                let ydim = d3.scaleLinear().domain([0,1]).range([heightdim,0]);
+                let xdim = d3.scaleBand().domain(dimensions).range([0,widthdim]).padding(0.05);
+
+                //https://github.com/d3/d3-scale-chromatic#schemeBlues
+                var colorsdim = d3.scaleOrdinal().domain(dimensions).range(d3.schemeBlues[8]);
+                let xAxisdim = d3.axisBottom().scale(xdim);
+                let yAxisdim = d3.axisLeft().scale(ydim).tickValues([0.0,0.25,0.50,0.75,1]);
+
+                var ctdata = data.get("Afghanistan");
+                //console.log(ctdata);
+
+                var bar = svgd.selectAll("g")
+                    .data(dimensions)
+                    .enter()
+                    .append("g")
+
+                bar.append("rect")
+                    .attr("x",function(d){//console.log(xdim(d));
+                        return xdim(d)})
+                    .attr("y",function(d){//console.log(heightdim);
+                        return ydim(ctdata[d])})
+                    .attr("width",xdim.bandwidth())
+                    .attr("height",function(d){console.log(d,ctdata[d],heightdim-ydim(ctdata[d]));
+                        return heightdim-ydim(ctdata[d]);})
+                    .style("fill", function(d){//console.log(colorsdim(d));
+                        return colorsdim(d)})
+                    .style("stroke","black")
+
+
+                bar.append("text")
+                    .attr("x",function(d){ return xdim(d)})
+                    .attr("y",function(d){ return ydim(ctdata[d])})
+                    .attr("dy","1em")
+                    .attr("font-size",10)
+                    .text(function(d) {return d})
+
+                svgdt = d3.select("#dimchart_txt").append('svg').attr('width',widthdim).attr("height",20)
+                svgdt.append("text")
+                    .text("HDI & Inequality loss")
+                    .attr("transform","translate(0,10)")
+                    .style("font-family","sans-serif")
+                    .style("font-size","10px")
+                    .style("stroke","lightblue")
+
+                svgdt.append("text")
+                    .text("HDI Dimensions")
+                    .attr("transform","translate(230,10)")
+                    .style("font-family","sans-serif")
+                    .style("font-size","10px")
+                    .style("stroke","lightblue")
+                //////////////////////////////////////////////////////////////////////////////////////
+                //////////////////////////////////// Draw the tip info ///////////////////////////////
+                //////////////////////////////////////////////////////////////////////////////////////
+                // let heighttip = 150, widthtip = 200;
+                // let svgt = d3.select("#infotip").append("svg").attr('width',widthtip).attr('height',heighttip)
+                //
+                // var info = svgt.selectAll("g").data(country).enter().append("g")
+                // info.append("rect")
+                //     .attr("x",0).attr("y",0).attr("width",widthtip).attr("height",heighttip).style("stroke","blue").style("fill","white")
+
+                /*info.append("text")
+                    .attr("x","5px")
+                    .attr("y","5px")
+                    .attr("dy",".5em")
+                    .text(
+                        function(d){console.log(d)
+                            ctdata = data.get(d);
+                            return d}
+                    )*/
+                var country = ["Afghanistan"]  // Need a country to Start
+                var infohtml = d3.select("#infotip")
+                    .selectAll("p")
+                    .data(country).enter().append("p").attr("line-height","50px")
+                    .attr("transform","translate(50,0)")
+                infohtml.html(function(d){ var ctdata = data.get(d); //console.log(ctdata)
+                    return "<b style=\"color:orange;\">" +
+                        "Country: "+ctdata.country
+                        +"<BR>HD rank: "+ctdata.hdi_rank
+                        +"<BR>HD value: "+ctdata.hdi_value
+                        +"<BR>Life exp:\t "+ctdata["life exp"]+" years"
+                        +"<BR>Expected Schooling: "+ctdata["school exp"]+" years"
+                        +"<BR>GNI: $"+ctdata.gni
+                })
+
+
+                //////////////////////////////////////////////////////////////////////////////////////
+                //////////////////////////////////// Draw the trend in hdi ///////////////////////////////
+                //////////////////////////////////////////////////////////////////////////////////////
+
+                let heightl = 320, widthl = 500;
+                let marginl = {top:10, bottom:10, left:20, right:20};
+
+                var svgl = d3.select("#linechart").append("svg").attr("width",widthl).attr("height",heightl);
+                var g=svgl.append("g").attr("transform","translate(" + marginl.left + "," + marginl.top + ")");
+
+                var parseTime = d3.timeParse("%y");
+                xl = d3.scaleLinear().range([0,widthl]).domain([1990,2018]);  //rangeBand for discrete to continous
+                yl = d3.scaleLinear().range([heightl, 0]).domain([0,1]);
+
+                let xAxisl = d3.axisBottom().scale(xl).tickValues([1990,1995,2000,2005,2010,2015]).tickFormat(d3.format("y"));
+
+                let years = hdi_trend.columns.slice(2);
+
+                // make data easy to plot.  Country: ( year:  value:)
+                var line_data = hdi_trend.map(function(row){ //console.log(row);
+                    return {"country": row.country, "line_data": years.map(function(year){ //console.log(year, row[year]);
+                            return{"year":year, "value":row[year]}
+                        })}
+                });
+
+                //console.log(line_data);
+                var line =  d3.line()
+                    .curve(d3.curveBasis)
+                    .defined(function(d){return d.value > 0})
+                    .x(function(d){return xl(d.year)})
+                    .y(function(d){return yl(d.value)})
+
+                 var trend = g.selectAll(".trend")
+                     .data(line_data)
+                     .enter()
+                     .append("g")
+                     .attr("class","trend");
+
+                trend.append("path")
+                    .attr("class","line")
+                    .attr("d",function(d) {return line(d.line_data)})
+                    .style("stroke" ,"lightgray").style("fill","none")
+                    .on("mouseover", function(d){ console.log(this,d);
+                        d3.select(this).style("stroke","blue").style("stroke-width","3px");
+                        update_dimchart(d.country);
+                        update_dimcharth(d.country);
+                        update_tipinfo(d.country);
+                        update_wmap_ct(d.country);
+                        update_happy_wmap_ct(d.country);
+                        update_scatter(d.country);
+
+                    })
+                    .on("mouseout", function(d){ //console.log(this)
+                        d3.select(this).style("stroke","lightgray").style("stroke-width","1px");
+                    })
+
+
+                trend.append("text")
+                    .text("HDI trend over the years")
+                    .attr("transform","translate(240,300)")
+                    .style("font-family","sans-serif")
+                    .style("font-size","15px")
+                    .style("stroke","lightblue")
+
+                trend.append("g")
+                    .attr("transform", "translate(0,260)")
+                   // .style("stroke","lightblue")
+                    .style("fill","lightblue")
+                    .call(xAxisl)
+                //     .attr("class","line")
+                //     .data(data2)
+                //     .attr("d",function)
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                //wmap_happy_legends and color selection here.
+                var w=600, h=50;
+                var color_options_lg2 = ["rainbow","chloropleth","quartile","half"];
+                var svg_lg2 = d3.select("#wmap_happy_legends").append("svg").attr("width",w).attr("height",h);
+                var background_lg2 =  svg_lg2.append("rect").attr("id","backgroundRect").attr("fill","white").attr("width","100%").attr("height","100%").attr("x",0).attr("y",0)
+                var button_lg2 =  svg_lg2.append("g").attr("id","button_lg2")
+                var button_lg2_groups = button_lg2.selectAll("g.button2")
+                    .data(color_options_lg2)
+                    .enter()
+                    .append("g")
+                    .attr("class","button2")
+                    .style("cursor","pointer");
+
+                var bWidth= 40; //button width
+                var bHeight= 25; //button height
+                var bSpace= 10; //space between buttons
+                var x0= 20; //x offset
+                var y0= 10; //y offset
+
+                button_lg2_groups.append("rect")
+                    .attr("class","buttonRect")
+                    .attr("width",bWidth)
+                    .attr("height",bHeight)
+                    .attr("x",function(d,i) {
+                        return x0+(bWidth+bSpace)*i;
+                    })
+                    .attr("y",y0)
+                    .attr("rx",5)
+                    .attr("ry",5)
+                    //.attr("fill","lightblue")
+                    .attr("fill",function(d){console.log(color_lg1(d)); return color_lg1(d)})
+                    .on("mouseover",function(d){d3.select(this).style("stroke","blue").style("stroke-width","3px")})
+                    .on("mouseout",function(d){d3.select(this).style("stroke","white").style("stroke-width","1px")})
+                    .on("click",function(d){
+                        //console.log(d)
+                        setColors_happy_wmap(d);
+                    })
+                function setColors_happy_wmap(d) {
+                    if(d=="rainbow"){
+                        var color = d3.scaleThreshold()
+                            .domain([.1, .2, .3, .4, .5, .6, .7, .8, .9, 1])
+                            .range(d3.schemeRdYlGn[10])
+                        //.range(["#FF0000","#FF4400","#FF9900","#FFCC00","#FFFF00","#BBFF00","#77FF00","#44FF00","#22FF00","#00FF00"]);
+                      //  var color = d3.interpolateRdYlGn
+                        update_happy_wmap(color);
+                    }
+                    if(d=="chloropleth"){
+                        var color = d3.scaleThreshold()
+                            .domain([.2, .3, .4, .5, .6, .7, .8, .9, 1])
+                            .range(d3.schemeBlues[9])
+                        //.range(['rgb(247,251,255)', 'rgb(222,235,247)', 'rgb(198,219,239)', 'rgb(158,202,225)', 'rgb(107,174,214)', 'rgb(66,146,198)', 'rgb(33,113,181)', 'rgb(8,81,156)', 'rgb(8,48,107)', 'rgb(3,19,43)']);
+                        update_happy_wmap(color);
+                    }
+                    if(d=="quartile"){
+                        var color = d3.scaleThreshold()
+                            .domain([ .25,  .5, .75,  1])
+                            .range(d3.schemeOranges[4])
+                        //.range(['rgb(247,251,255)', 'rgb(158,202,225)',  'rgb(33,113,181)',  'rgb(3,19,43)']);
+                        update_happy_wmap(color);
+                    }
+                    if(d=="half"){
+                        var color = d3.scaleThreshold()
+                            .domain([.5, 1])
+                            .range(['rgb(247,251,255)', 'rgb(107,174,214)',  'rgb(3,19,43)']);
+                        update_happy_wmap(color);
+                    }
+                }
+
+                function update_happy_wmap(color) {
+                    svgh.selectAll("path")
+                        .style("fill", function(d) { //console.log(d);
+                            //console.log(data1.get(d.properties.name));
+                            if(data1.get(d.properties.name)!=undefined) {
+                                var ctdata1 = data1.get(d.properties.name);
+                                if (ctdata1["hp_value_n"]) {
+                                    //console.log(ctdata1["hp_value_n"], ctdata1["country"], color(ctdata1["hp_value_n"]), color(0), color(1));
+
+                                    return color(ctdata1["hp_value_n"]);
+                                } else {
+                                    return "#888";
+                                }
+                            } else { return "lightgray"}
+                        })
+                }
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+                ///////////////////////////// Draw World Happiness map ////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+                var w = 600 ,
+                    h = 400;
+
+                //Define map projection
+                var projection = d3.geoMercator().translate([w/2, h/2]).scale([100]);
+                var path = d3.geoPath().projection(projection);
+                var color = d3.scaleThreshold()
+                    .domain([.1, .2, .3, .4, .5, .6, .7, .8, .9, 1])
+                    .range(d3.schemeRdYlGn[10])
+                var svgh = d3.select("#wmap_happy")
+                    .append("svg")
+                    .attr("class","geopath")
+                    .attr("width", w)
+                    .attr("height", h);
+
+                svgh.selectAll("path")
+                    .data(json.features)
+                    .enter()
+                    .append("path")
+                    .attr("class","worldmaph")   // All these paths can be later referred in update with selecting this class
+                    .attr("d", path)
+                    .attr("stroke","white")
+                    .attr("country",function(d){   // Add a property to each path for state with state name
+                        if(data1.get(d.properties.name)!=undefined) {
+                            var ctdata1 = data1.get(d.properties.name);
+                            //console.log(d.properties.name, ctdata["country"]);
+                            return ctdata1["country"];
+                        } else { //console.log(d.properties.name)
+                             }
+                    })
+                    .style("fill", function(d) { //console.log(d);
+                        //console.log(data1.get(d.properties.name));
+                        if(data1.get(d.properties.name)!=undefined) {
+                            var ctdata1 = data1.get(d.properties.name);
+                            if (ctdata1["hp_value_n"]) {
+                                //console.log(ctdata1["hp_value_n"], ctdata1["country"], color(ctdata1["hp_value_n"]), color(0), color(1));
+                                return color(ctdata1["hp_value_n"]);
+                            } else {
+                                return "#888";
+                            }
+                        } else {return "lightgray"}
+                    })
+                    .text(function(d) {
+                        if(data.get(d.properties.name)!=undefined) {
+                            var ctdata = data.get(d.properties.name);
+                            //console.log(d.properties.name, ctdata["country"]);
+                            return ctdata["country"];
+                        }
+                    })
+                    .on("mouseover",function(d) {
+                        //console.log(this);
+                        d3.select(this).style("stroke","white").style("stroke-width","3px");
+                        console.log(d.properties.name,data1.get(d.properties.name))
+                        if(data.get(d.properties.name)!=undefined) {
+                            var ctdata = data1.get(d.properties.name);
+                            update_dimchart(d.properties.name);
+                            update_dimcharth(d.properties.name);
+                            update_tipinfo(d.properties.name);
+                            update_line(d.properties.name);
+                            update_scatter(d.properties.name)
+                        } else { console.log(d.properties.name)}
+
+                    })
+                    .on("mouseout",function(d){
+                        d3.select(this).style("stroke","white").style("stroke-width","1px")
+                    });
+
+
+                ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                /////////////////////////////////         Scatter Plot      ///////////////////////////////////////////////
+                ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                let heightsc = 460, widthsc = 500;
+                let marginsc = {top:10, bottom:10, left:20, right:20};
+                let svgsc = d3.select("#scatterplot").append('svg')
+                    .attr('width',widthsc)
+                    .attr('height',heightsc)
+
+                let xsc = d3.scaleLinear().domain([.2,1]).range([widthsc-100,0]);
+                let ysc = d3.scaleLinear().domain([0,1]).range([heightsc-100,0]);
+
+                let xAxissc = d3.axisBottom().scale(xsc);
+                let yAxissc = d3.axisLeft().scale(ysc);
+
+
+                var scat = svgsc.selectAll("g").data(countries).enter().append("g");
+
+                scat.append("circle")
+                    .attr("cx",function(d){
+                        if(data.get(d) != undefined && data1.get(d) != undefined){
+                            var hd_data = data.get(d); //console.log(d,hd_data["adj_value"],xsc(hd_data["adj_value"]))
+                            return widthsc-xsc(hd_data["hdi_value"])}
+                    })
+                    .attr("cy",function(d){
+                        if(data.get(d) != undefined && data1.get(d) != undefined) {
+                            var hp_data = data1.get(d); //console.log(d,hp_data["hp_value_n"],ysc(hp_data["hp_value_n"]))
+                            return ysc(hp_data["hp_value_n"])}
+                    })
+                    .attr("r",6)
+                    .style("stroke","white")
+                    .style("fill", function(d){
+                        if(data.get(d) != undefined && data1.get(d) != undefined){
+                            var hd_data = data.get(d);
+                            var hp_data = data1.get(d);
+                            //console.log(hd_data["hdi_value"]*hp_data["hp_value_n"]);
+                            return d3.interpolateRdYlGn(hd_data["hdi_value"]*hp_data["hp_value_n"])}
+                    })
+                    .attr("ct",function(d){return d;})
+                    //.attr("happiness",data1.get(d)["hp_value_n"])
+                    //.attr("hdi",data.get(d)["adj_value"])
+                    .attr("transform", "translate(-80,50) rotate(0)")
+                    .on("mouseover", function(d){
+                        d3.select(this).attr("stroke", "green").transition().delay(100).attr("r",20)
+                        d3.select(this).attr("stroke","blue").transition().delay(500).attr("r",6)
+                        console.log(this)
+                        update_dimchart(d);
+                        update_dimcharth(d);
+                        update_tipinfo(d);
+                        update_line(d);
+                        update_happy_wmap_ct(d);
+                        update_wmap_ct(d);
+
+
+                    })
+                    .on("mouseout",function(d){
+                       // d3.select(this).attr("stroke","blue").attr("r",2).style("fill","blue")
+                    })
+                    .append('title')
+                    .html(function(d){
+                        //console.log(d);
+                        if(data.get(d) != undefined && data1.get(d) != undefined) {
+                            var hp_data = data1.get(d)
+                            var hd_data = data.get(d)
+                            //console.log( hp_data["hp_value_n"])
+                            return "<b></b><BR><BR>   "+ d+
+                                " <BR> Happiness:  "+ hp_data["hp_value_n"]+
+                                " <BR> HDI:  "+ hd_data["hdi_value"];
+                        }
+
+                        //console.log(d)
+                    })
+
+                scat.append("text")
+                    //.attr("x", function(d) { return 100; })
+                    //.attr("y", function(d) { return 30;})
+                    .text("Happiness >>>>")
+                    .attr("font-family","sans-serif")
+                    .attr("font-size","20px")
+                    .attr("fill","lightblue")
+                    .attr("transform", "translate(40,250) rotate(270)")
+
+                scat.append("text")
+                    // .attr("x", function(d) { return 350; })
+                    // .attr("y", function(d) { return 250;})
+                    .text("Human Development Index >>>>")
+                    .attr("font-family","sans-serif")
+                    .attr("font-size","20px")
+                    .attr("fill","lightblue")
+                    .attr("transform", "translate(130,320) rotate(0)")
+
+
+                ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                /////////////////////////////////         dimchart_happy      ///////////////////////////////////////////////
+                ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+                let heightdimh = 150, widthdimh = 350;
+                let margindimh = {top:10, bottom:10, left:20, right:20};
+                let svgdh = d3.select("#dimchart_happy").append('svg')
+                    .attr('width',widthdimh)
+                    .attr('height',heightdimh)
+                //.append("g")
+                //.attr("transform","translate(10,10)");
+
+                var dimensionsh = ["hp_value"," ","gdp","social_support","life_exp","freedom","generosity","perceived_corruption"];
+                let ydimh = d3.scaleLinear().domain([0,1]).range([heightdimh,0]);
+                let xdimh = d3.scaleBand().domain(dimensionsh).range([0,widthdimh]).padding(0.05);
+
+                //https://github.com/d3/d3-scale-chromatic#schemeBlues
+                var colorsdimh = d3.scaleOrdinal().domain(dimensionsh).range(d3.schemeGreens[9]);
+                let xAxisdimh = d3.axisBottom().scale(xdimh);
+                let yAxisdimh = d3.axisLeft().scale(ydimh).tickValues([0.0,0.25,0.50,0.75,1]);
+
+                var ctdatah = data1.get("Afghanistan");
+                //console.log(ctdata);
+
+                var barh = svgdh.selectAll("g")
+                    .data(dimensionsh)
+                    .enter()
+                    .append("g")
+
+                barh.append("rect")
+                    .attr("x",function(d){//console.log(xdim(d));
+                        return xdimh(d)})
+                    .attr("y",function(d){//console.log(heightdim);
+                        return ydimh(ctdatah[d])})
+                    .attr("width",xdimh.bandwidth())
+                    .attr("height",function(d){console.log(d,ctdatah[d],heightdimh-ydimh(ctdatah[d]));
+                        return heightdimh-ydimh(ctdatah[d]);})
+                    .style("fill", function(d){//console.log(colorsdim(d));
+                        return colorsdimh(d)})
+                    .style("stroke","black")
+
+
+                barh.append("text")
+                    .attr("x",function(d){ return xdimh(d)})
+                    .attr("y",function(d){ return ydimh(ctdatah[d])})
+                    .attr("dy","1em")
+                    .attr("font-size",10)
+                    .text(function(d) {return d})
+
+                // svgdth = d3.select("#dimchart_txth").append('svg').attr('width',widthdim).attr("height",20)
+                // svgdth.append("text")
+                //     .text("HDI & Inequality loss")
+                //     .attr("transform","translate(0,10)")
+                //     .style("font-family","sans-serif")
+                //     .style("font-size","10px")
+                //     .style("stroke","lightblue")
+                //
+                // svgdth.append("text")
+                //     .text("HDI Dimensions")
+                //     .attr("transform","translate(230,10)")
+                //     .style("font-family","sans-serif")
+                //     .style("font-size","10px")
+                //     .style("stroke","lightblue")
+
+
+
+
+            })
+    </script>
+</body>
+
+</html>
